@@ -5,6 +5,9 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Maybe exposing (withDefault)
+import Debug exposing (log)
+import List exposing (length)
+import List.Extra exposing (replaceIf, find)
 
 
 type Msg
@@ -17,7 +20,8 @@ type Msg
 
 
 type alias Model =
-    { players : List Player
+    { lastPlayerId : PlayerId
+    , players : List Player
     , editPlayerName : Maybe String
     , editPlayerId : Maybe Int
     , plays : List Play
@@ -47,12 +51,8 @@ type alias Play =
 
 initialModel : Model
 initialModel =
-    { players =
-        [ { id = 0
-          , name = "Lukis"
-          , points = 90
-          }
-        ]
+    { lastPlayerId = 0
+    , players = []
     , editPlayerName = Nothing
     , editPlayerId = Nothing
     , plays = []
@@ -73,6 +73,85 @@ actionCanel model =
     }
 
 
+actionSave : Model -> Model
+actionSave model =
+    let
+        nextPlayerId =
+            model.lastPlayerId + 1
+    in
+        case ( model.editPlayerName, model.editPlayerId ) of
+            ( Just name, Just id ) ->
+                let
+                    maybePlayer =
+                        find (\p -> p.id == id) model.players
+                in
+                    case maybePlayer of
+                        Just player ->
+                            let
+                                updatedPlayer =
+                                    { player | name = name }
+                            in
+                                { model
+                                    | players = (replaceIf (\player -> player.id == id) updatedPlayer model.players)
+                                }
+
+                        _ ->
+                            model
+
+            ( Just name, _ ) ->
+                { model
+                    | players =
+                        { id = nextPlayerId
+                        , name = name
+                        , points = 0
+                        }
+                            :: model.players
+                    , lastPlayerId = nextPlayerId
+                }
+
+            _ ->
+                model
+
+
+actionScore : PlayerId -> Int -> Model -> Model
+actionScore playerId points model =
+    let
+        maybePlayer =
+            find (\p -> p.id == playerId) model.players
+    in
+        case maybePlayer of
+            Just player ->
+                let
+                    updatedPlayer =
+                        { player
+                            | points = player.points + points
+                        }
+                in
+                    { model
+                        | players = (replaceIf (\player -> player.id == playerId) updatedPlayer model.players)
+                    }
+
+            _ ->
+                model
+
+
+actionEdit : PlayerId -> Model -> Model
+actionEdit playerId model =
+    let
+        maybePlayer =
+            find (\p -> p.id == playerId) model.players
+    in
+        case maybePlayer of
+            Just p ->
+                { model
+                    | editPlayerName = Just p.name
+                    , editPlayerId = Just p.id
+                }
+
+            _ ->
+                model
+
+
 update : Msg -> Model -> Model
 update msg inputModel =
     let
@@ -86,6 +165,15 @@ update msg inputModel =
             Cancel ->
                 actionCanel model
 
+            Save ->
+                actionSave model
+
+            Edit playerId ->
+                actionEdit playerId model
+
+            Score playerId score ->
+                actionScore playerId score model
+
             _ ->
                 model
 
@@ -95,15 +183,28 @@ renderHeader model =
     h1 [] [ text "Score Keeper" ]
 
 
-renderPlayer : Player -> Html Msg
-renderPlayer player =
-    div []
-        [ button [ onClick (Edit player.id) ] [ text "edit" ]
-        , text player.name
-        , button [ onClick (Score player.id 2) ] [ text "2pt" ]
-        , button [ onClick (Score player.id 3) ] [ text "3pt" ]
-        , text (toString player.points)
-        ]
+renderPlayer : Model -> Player -> Html Msg
+renderPlayer model player =
+    let
+        selectedClass : String
+        selectedClass =
+            case model.editPlayerId of
+                Just id ->
+                    if (player.id == id) then
+                        "pure-button-selected"
+                    else
+                        ""
+
+                _ ->
+                    ""
+    in
+        li [ class selectedClass ]
+            [ i [ class "fa-edit", onClick (Edit player.id) ] []
+            , text player.name
+            , button [ class "pure-button", onClick (Score player.id 2) ] [ text "2pt" ]
+            , button [ class "pure-button", onClick (Score player.id 3) ] [ text "3pt" ]
+            , text (toString player.points)
+            ]
 
 
 renderPlayerSection : Model -> Html Msg
@@ -111,7 +212,7 @@ renderPlayerSection model =
     section [ class "players-section" ]
         [ div []
             [ h2 [] [ text "Players section header" ]
-            , div [] (List.map renderPlayer model.players)
+            , ul [] (List.map (renderPlayer model) model.players)
             ]
         ]
 
@@ -120,7 +221,7 @@ renderPlayerForm : Model -> Html Msg
 renderPlayerForm model =
     section [ class "player-form" ]
         [ div []
-            [ Html.form [ onSubmit Save ]
+            [ Html.form [ onSubmit Save, class "pure-form" ]
                 [ input
                     [ placeholder "Add/Edit Player..."
                     , type' "text"
