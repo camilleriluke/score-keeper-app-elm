@@ -8,6 +8,7 @@ import Maybe exposing (withDefault)
 import Debug exposing (log)
 import List exposing (length)
 import List.Extra exposing (replaceIf, find)
+import String exposing (isEmpty, trim)
 
 
 type Msg
@@ -170,7 +171,13 @@ update msg inputModel =
                 actionCanel model
 
             Save ->
-                actionSave model
+                if ((Maybe.withDefault "" model.editPlayerName) |> trim |> isEmpty) then
+                    { model
+                        | editPlayerId = Nothing
+                        , editPlayerName = Nothing
+                    }
+                else
+                    actionSave model
 
             Edit playerId ->
                 actionEdit playerId model
