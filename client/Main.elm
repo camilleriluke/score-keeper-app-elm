@@ -93,6 +93,8 @@ actionSave model =
                             in
                                 { model
                                     | players = (replaceIf (\player -> player.id == id) updatedPlayer model.players)
+                                    , editPlayerId = Nothing
+                                    , editPlayerName = Nothing
                                 }
 
                         _ ->
@@ -107,6 +109,8 @@ actionSave model =
                         }
                             :: model.players
                     , lastPlayerId = nextPlayerId
+                    , editPlayerId = Nothing
+                    , editPlayerName = Nothing
                 }
 
             _ ->
@@ -213,6 +217,18 @@ renderPlayerSection model =
         [ div []
             [ h2 [] [ text "Players section header" ]
             , ul [] (List.map (renderPlayer model) model.players)
+            , div []
+                [ strong []
+                    [ text
+                        ("Total: "
+                            ++ (toString
+                                    ((List.map (\p -> p.points) model.players)
+                                        |> List.sum
+                                    )
+                               )
+                        )
+                    ]
+                ]
             ]
         ]
 
