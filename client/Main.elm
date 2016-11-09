@@ -74,86 +74,124 @@ actionCanel model =
     }
 
 
-actionSave : Model -> Model
-actionSave model =
-    let
-        nextPlayerId =
-            model.lastPlayerId + 1
-    in
-        case ( model.editPlayerName, model.editPlayerId ) of
-            ( Just name, Just id ) ->
-                let
-                    maybePlayer =
-                        find (\p -> p.id == id) model.players
-                in
-                    case maybePlayer of
-                        Just player ->
-                            let
-                                updatedPlayer =
-                                    { player | name = name }
-                            in
-                                { model
-                                    | players = (replaceIf (\player -> player.id == id) updatedPlayer model.players)
-                                    , editPlayerId = Nothing
-                                    , editPlayerName = Nothing
-                                }
-
-                        _ ->
-                            model
-
-            ( Just name, _ ) ->
-                { model
-                    | players =
-                        { id = nextPlayerId
-                        , name = name
-                        , points = 0
-                        }
-                            :: model.players
-                    , lastPlayerId = nextPlayerId
-                    , editPlayerId = Nothing
-                    , editPlayerName = Nothing
-                }
-
-            _ ->
-                model
-
-
-actionScore : PlayerId -> Int -> Model -> Model
-actionScore playerId points model =
+editPlayer : Model -> PlayerId -> String -> Model
+editPlayer model id name =
     let
         maybePlayer =
-            find (\p -> p.id == playerId) model.players
+            lookupPlayer model.players id
     in
         case maybePlayer of
             Just player ->
-                let
-                    updatedPlayer =
-                        { player
-                            | points = player.points + points
-                        }
-                in
-                    { model
-                        | players = (replaceIf (\player -> player.id == playerId) updatedPlayer model.players)
-                    }
+                replacePlayer (updatePlayerName player name) model
 
-            _ ->
+            Nothing ->
                 model
 
 
-actionEdit : PlayerId -> Model -> Model
-actionEdit playerId model =
+addPlayer : Model -> String -> Model
+addPlayer model name =
+    let
+        nextPlayerId =
+            model.lastPlayerId + 1
+
+        model =
+            { model
+                | lastPlayerId = nextPlayerId
+            }
+
+        newPlyer =
+            { id = nextPlayerId
+            , name = name
+            , points = 0
+            }
+    in
+        addPlayerToModel model newPlyer
+
+
+actionSave : Model -> Model
+actionSave model =
+    case ( model.editPlayerName, model.editPlayerId ) of
+        ( Just name, Just id ) ->
+            editPlayer model id name
+
+        ( Just name, _ ) ->
+            addPlayer model name
+
+        _ ->
+            model
+
+
+lookupPlayer : List Player -> PlayerId -> Maybe Player
+lookupPlayer players playerId =
+    find (\p -> p.id == playerId) players
+
+
+addPlayerToModel : Model -> Player -> Model
+addPlayerToModel model player =
+    { model
+        | players = player :: model.players
+    }
+
+
+fromPlayers : Model -> List Player
+fromPlayers model =
+    model.players
+
+
+replacePlayer : Player -> Model -> Model
+replacePlayer player model =
+    { model
+        | players = (replaceIf (\p -> p.id == player.id) player model.players)
+    }
+
+
+updatePlayerScore : Player -> Int -> Player
+updatePlayerScore player points =
+    { player
+        | points = player.points + points
+    }
+
+
+updatePlayerName : Player -> String -> Player
+updatePlayerName player name =
+    { player
+        | name = name
+    }
+
+
+actionScore : PlayerId -> Int -> Model -> Model
+actionScore id points model =
     let
         maybePlayer =
-            find (\p -> p.id == playerId) model.players
+            lookupPlayer model.players id
     in
         case maybePlayer of
-            Just p ->
-                { model
-                    | editPlayerName = Just p.name
-                    , editPlayerId = Just p.id
-                }
+            Just player ->
+                replacePlayer (updatePlayerScore player points) model
 
-            _ ->
+            Nothing ->
+                model
+
+
+setEditingForPlayer : Model -> Player -> Model
+setEditingForPlayer model player =
+    { model
+        | editPlayerName = Just player.name
+        , editPlayerId = Just player.id
+    }
+
+
+actionEdit : PlayerId -> Model -> Model
+actionEdit id model =
+    let
+        maybePlayer =
+            lookupPlayer model.players id
+    in
+        case maybePlayer of
+            Just player ->
+                setEditingForPlayer model player
+
+            Nothing ->
                 model
 
 
@@ -171,13 +209,21 @@ update msg inputModel =
                 actionCanel model
 
             Save ->
-                if ((Maybe.withDefault "" model.editPlayerName) |> trim |> isEmpty) then
-                    { model
-                        | editPlayerId = Nothing
-                        , editPlayerName = Nothing
-                    }
-                else
-                    actionSave model
+                let
+                    editName =
+                        (Maybe.withDefault "" model.editPlayerName)
+                            |> trim
+
+                    model =
+                        if (not (isEmpty editName)) then
+                            actionSave model
+                        else
+                            model
+                in
+                    model
+                        -- This is to clear editing / saving state
+                        |>
+                            actionCanel
 
             Edit playerId ->
                 actionEdit playerId model
