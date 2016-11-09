@@ -264,6 +264,17 @@ renderPlayer model player =
             ]
 
 
+renderTotal : Int -> Html Msg
+renderTotal total =
+    text ("Total: " ++ (toString total))
+
+
+sumTotal : List Player -> Int
+sumTotal players =
+    (List.map (\p -> p.points) players)
+        |> List.sum
+
+
 renderPlayerSection : Model -> Html Msg
 renderPlayerSection model =
     section [ class "players-section" ]
@@ -272,15 +283,7 @@ renderPlayerSection model =
             , ul [] (List.map (renderPlayer model) model.players)
             , div []
                 [ strong []
-                    [ text
-                        ("Total: "
-                            ++ (toString
-                                    ((List.map (\p -> p.points) model.players)
-                                        |> List.sum
-                                    )
-                               )
-                        )
-                    ]
+                    [ renderTotal (sumTotal model.players) ]
                 ]
             ]
         ]
